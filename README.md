@@ -6,3 +6,5 @@ use postman for testing
 make sure to use urls /,/home,/contacts.... and /styles.cc,/app.js
 
 Adding security feature is still pending
+
+the main function is in main.cpp
