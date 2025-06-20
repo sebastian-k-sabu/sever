@@ -20,16 +20,17 @@ make sure to use urls
 
 work completed:
 
-1 Basic Server
+## 1 Basic Server
 handles get request for now
 
-2 MultiThreading
+## 2 MultiThreading
 has a threadpool may still lack some security featues.Uses mutex and conditional_varibles for accesing clientQueue
 
-3 Loging events
+## 3 Loging events
 Logs client request method type and respose.
 needs to be polished
 
-work remaining
+# work remaining
 
-4 Json Parser: Therefore donot complie jsonParser.cpp
+## 4 Json Parser: 
+#### Therefore donot complie jsonParser.cpp
