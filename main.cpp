@@ -11,25 +11,61 @@
 #include "jsonParser.hpp"
 #include <thread>
 #include <ctime>
+#include <queue>
+#include <mutex>
+#include <vector>
+#include <condition_variable>
 
 #define PORT 8080
 
 using namespace std;
 
-void handleClinet(int* clientSocket){
-    while(*clientSocket > 0){
-    char buffer[1024] = {0};
+const int threadSize = 8;
+vector<thread> threadPool;
+queue<int> clientQueue;
+mutex mainLock; //this lock when server pushs data
+mutex mtx;  // this lock when thread access data
+condition_variable cv;
+void stopThreadPool() {
+    cv.notify_one();
+    for(auto& t : threadPool) {
+        if(t.joinable()) t.join();
+    }
+}
+void handleClinet(int i);
+int createThreadPool() {
+    for (int i = 0; i < threadSize; i++) {
+        threadPool.emplace_back(handleClinet,i);
+    }
+    return 0;
+}
 
-    recv(*clientSocket,buffer,sizeof(buffer),0);
-    string sentData = processData(buffer);
-    //removeSpace(buffer);
 
+void handleClinet(int i){
+    while(true){//keeps looping for checking element in queue
+            unique_lock<mutex> lock(mtx);
+            cv.wait(lock,[] {return !clientQueue.empty();});
+            int clientSocket = clientQueue.front();
+            clientQueue.pop();
+            lock.unlock();
+            
+            while (true)//keeps looping to server client 
+            {
+                
+                char buffer[1024] = {0};
+                recv(clientSocket,buffer,sizeof(buffer),0);
+                cout<< "thread "<<i<<" is handaling"<<endl;
+                cout << buffer<<endl;
+                string sentData = processData(buffer);
+                //removeSpace(buffer);
+                    if(sentData == "quit")
+                        break;
+                 send(clientSocket, sentData.c_str(),sentData.length(),0);
+            }
     
-    send(*clientSocket, sentData.c_str(),sentData.length(),0);
-
+    close(clientSocket);
 
     }
-    close(*clientSocket);
 }
 
 int main(){
@@ -66,7 +102,7 @@ char formattedTime[80];
 strftime(formattedTime, sizeof(formattedTime), "%Y-%m-%d %H:%M:%S", localTime);
 cout << formattedTime <<" server started"<<endl;
 int serverRun = 1;
-
+createThreadPool();
 while (serverRun)
 {   
     //client address
@@ -74,6 +110,9 @@ while (serverRun)
     int addrlen = sizeof(clientAddress);
      
     int clientSocket = accept(serverSocket,(struct sockaddr*)&clientAddress,(socklen_t*)&addrlen);
+    mainLock.lock();
+    clientQueue.push(clientSocket);
+    cv.notify_all();
     char clientIP[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &(clientAddress.sin_addr), clientIP, INET_ADDRSTRLEN);
 
@@ -82,8 +121,7 @@ while (serverRun)
     cout << formattedTime<<" "<<clientIP<<" connected"<<endl;
 
     //serverRun = 0;
-    thread(handleClinet,&clientSocket).detach();
     //handleClinet(&clientSocket);
 }
-
+  stopThreadPool();
 } 
