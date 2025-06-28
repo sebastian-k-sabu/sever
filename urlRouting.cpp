@@ -4,16 +4,10 @@
 #include <fstream>
 #include <vector>
 #include <map>
-
-
+#include "log.hpp"
 using namespace std;
-string getCurrentTime() {
-    time_t now = time(0);
-    tm* localTime = localtime(&now);
-    char formattedTime[80];
-    strftime(formattedTime, sizeof(formattedTime), "%Y-%m-%d %H:%M:%S", localTime);
-    return string(formattedTime);
-}
+string web = "static/";
+
 string getFILE(string URL){
     ifstream f(URL);
     int dotPosition = URL.find(".");
@@ -26,7 +20,7 @@ string getFILE(string URL){
     {".jpg", "image/jpeg"}
     };
     if (!f.is_open()) {
-        //cerr << "Error opening the file!";
+        cerr << "Error opening the file!";
         return " ";
     }
     string s;
@@ -61,23 +55,23 @@ string checkRoute(string URL){
     if(validURL){
       if(URL == "/"||URL == "/home"||URL == "/home.html")
       {
-        return getFILE("home.html");
+        return getFILE(web+"home.html");
       }else if(URL == "/contacts"||URL == "/contacts.html")
        {
-        return getFILE("contacts.html");
+        return getFILE(web+"contacts.html");
        }
        else if(URL == "/about"||URL == "/about.html")
        {
-        return getFILE("about.html");
+        return getFILE(web+"about.html");
        }
        else if(URL == "/app.js")
        {
-        return getFILE("app.js");
+        return getFILE(web+"app.js");
        }
        else if(URL == "/style.css")
        {
-        return getFILE("style.css");
+        return getFILE(web+"style.css");
        }
     }
-    return getFILE("error.html");
+    return getFILE(web+"404.html");
 }

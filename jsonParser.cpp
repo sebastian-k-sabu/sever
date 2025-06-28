@@ -1,171 +1,167 @@
+#include "jsonParser.hpp"
 #include <iostream>
-#include <map>
-#include <string>
 #include <algorithm>
 #include <cctype>
-#include "jsonParser.hpp"
-using namespace std;
 
-class jsonParser
-{
-private:
-    enum type{
-        INT,
-        DOUBLE,
-        STRING,
-        JSON,
+// jsonValue member implementations
+jsonParser::jsonValue::jsonValue() : type(INT), intValue(0) {}
 
-    };
-    struct jsonValue
-    {
-        type Type;
-        union 
-        {
-            int n;
-            double d;
-            string s;
-            jsonValue* json;
-        };
-        jsonValue() {
-            Type = type(INT);
-            n = 0;
-        }
+jsonParser::jsonValue::jsonValue(int val) : type(INT), intValue(val) {}
 
-        jsonValue(int value){
-            Type = type(INT);
-            n = value;
-        }
+jsonParser::jsonValue::jsonValue(double val) : type(DOUBLE), doubleValue(val) {}
 
-        jsonValue(double value){
-            Type = type(DOUBLE);
-            d = value;
-        }
+jsonParser::jsonValue::jsonValue(const std::string& val) : type(STRING) {
+    stringValue = new std::string(val);
+}
 
-        jsonValue(const std::string& value){
-            Type = type(STRING); 
-            new(&s) std::string(value); 
-        }
+jsonParser::jsonValue::jsonValue(std::map<std::string, jsonValue>* val) : type(JSON_OBJECT) {
+    objectValue = val;
+}
 
-        jsonValue(jsonValue* value){
-            Type = type(JSON);
-            json = value;
-        }
-        jsonValue(const jsonValue& other){
-            Type = other.Type;
-            switch(Type) {
-                case INT:    n = other.n; break;
-                case DOUBLE: d = other.d; break;
-                case STRING: new(&s) std::string(other.s); break;
-                case JSON:   json = other.json; break;
-            }
-        }
-        jsonValue& operator=(const jsonValue& other) {
-        if (this != &other) {
-            this->~jsonValue();
-
-            Type = other.Type;
-            switch (Type) {
-                case INT:    n = other.n; break;
-                case DOUBLE: d = other.d; break;
-                case STRING: new (&s) std::string(other.s); break;
-                case JSON:   json = new jsonValue(*other.json); break;
-            }
-        }
-        return *this;
+jsonParser::jsonValue::jsonValue(const jsonValue& other) : type(other.type) {
+    switch(type) {
+        case INT: intValue = other.intValue; break;
+        case DOUBLE: doubleValue = other.doubleValue; break;
+        case STRING: stringValue = new std::string(*other.stringValue); break;
+        case JSON_OBJECT: objectValue = new std::map<std::string, jsonValue>(*other.objectValue); break;
     }
-        ~jsonValue() {
-        if (Type == STRING) {
-            s.~basic_string();
+}
+
+jsonParser::jsonValue& jsonParser::jsonValue::operator=(const jsonValue& other) {
+    if (this != &other) {
+        this->~jsonValue();
+        type = other.type;
+        switch(type) {
+            case INT: intValue = other.intValue; break;
+            case DOUBLE: doubleValue = other.doubleValue; break;
+            case STRING: stringValue = new std::string(*other.stringValue); break;
+            case JSON_OBJECT: objectValue = new std::map<std::string, jsonValue>(*other.objectValue); break;
         }
     }
-    };
-
-    int position;
-    string data;
-    void skipSpace();
-    jsonValue parseINT();
-    jsonValue parseOBJECT();
-    jsonValue parseSTRING();
-    char peek();
-    char next();
-
-public:
-    jsonParser(string data);
-    jsonValue parse();
-    ~jsonParser();
-};
-
-jsonParser::jsonParser(string data)
-{
-    jsonParser::position = 0;
-    jsonParser::data = data;
-
-}
-jsonParser::jsonValue jsonParser::parseINT(){
-    string numStr;
-        char c = peek();
-        while (isNumberChar(c)) {
-            numStr += next();
-            c = peek();
-        }
-
-        if (numStr.find('.') != string::npos || 
-            numStr.find('e') != string::npos) {
-            double val= stod(numStr);
-            return jsonValue(val);
-        } else {
-            int val = stoi(numStr);
-            return jsonValue(val);
-        }
-}
-jsonParser::jsonValue jsonParser::parseOBJECT(){
-    
-}
-char jsonParser::peek()
-{
-    return data[position];
+    return *this;
 }
 
-void jsonParser::skipSpace()
-{
-    while (isspace(jsonParser::data[position]))
-    {
+jsonParser::jsonValue::~jsonValue() {
+    if (type == STRING) {
+        delete stringValue;
+    } else if (type == JSON_OBJECT) {
+        delete objectValue;
+    }
+}
+
+// jsonParser member implementations
+jsonParser::jsonParser(const std::string& jsonData) : position(0), data(jsonData) {}
+
+jsonParser::~jsonParser() = default;
+
+void jsonParser::skipSpace() {
+    while (position < data.size() && isspace(data[position])) {
         position++;
     }
 }
 
-char jsonParser::next(){
-    position++;
+char jsonParser::peek() const {
+    if (position >= data.size()) throw std::runtime_error("Unexpected end of input");
     return data[position];
 }
-bool isNumberChar(char c) {
-        return isdigit(c) || c == '-' || c == '+' || c == '.';
+
+char jsonParser::next() {
+    if (position >= data.size()) throw std::runtime_error("Unexpected end of input");
+    return data[position++];
 }
-jsonParser::jsonValue jsonParser::parse(){
-        skipSpace();
-        char c = peek();
 
-        switch (c) {
-            case '{': 
-                next();
-                return parseOBJECT(); 
+bool jsonParser::isNumberChar(char c) const {
+    return isdigit(c) || c == '-' || c == '+' || c == '.';
+}
 
-            case '\"': 
-                next();
-                return parseSTRING();
+jsonParser::jsonValue jsonParser::parseString() {
+    std::string str;
+    while (true) {
+        char c = next();
+        if (c == '"') break;
+        str += c;
+    }
+    return jsonValue(str);
+}
 
-            default:
-                if (isNumberChar(c)) {
-                    return parseINT(); 
-                } else {
-                    cerr << "Unexpected character: " << c << endl;
-                    return jsonValue(); 
-                }
+jsonParser::jsonValue jsonParser::parseNumber() {
+    std::string numStr;
+    char c = peek();
+    while (isNumberChar(c)) {
+        numStr += next();
+        c = peek();
+    }
+
+    if (numStr.find('.') != std::string::npos || numStr.find('e') != std::string::npos) {
+        return jsonValue(std::stod(numStr));
+    } else {
+        return jsonValue(std::stoi(numStr));
+    }
+}
+
+jsonParser::jsonValue jsonParser::parseObject() {
+    auto* obj = new std::map<std::string, jsonValue>();
+    skipSpace();
+
+    if (next() != '{') {
+        delete obj;
+        throw std::runtime_error("Expected '{' at start of object");
+    }
+    skipSpace();
+
+    while (peek() != '}') {
+        if (peek() != '"') {
+            delete obj;
+            throw std::runtime_error("Expected string key");
         }
+        next(); // Skip opening quote
+        
+        jsonValue keyValue = parseString();
+        if (keyValue.type != STRING || !keyValue.stringValue) {
+            delete obj;
+            throw std::runtime_error("Invalid string key");
+        }
+        std::string key = *keyValue.stringValue;
+        
+        skipSpace();
+        if (next() != ':') {
+            delete obj;
+            throw std::runtime_error("Expected ':' after key");
+        }
+        skipSpace();
+        
+        jsonValue value = parseValue();
+        (*obj)[key] = value;
+        
+        skipSpace();
+        if (peek() == ',') {
+            next();
+            skipSpace();
+        }
+    }
+    next(); // Skip closing '}'
+    return jsonValue(obj);
 }
+
+jsonParser::jsonValue jsonParser::parseValue() {
+    skipSpace();
+    char c = peek();
     
-
-jsonParser::~jsonParser()
-{
+    if (c == '{') return parseObject();
+    if (c == '"') {
+        next(); // Skip opening quote
+        return parseString();
+    }
+    if (isNumberChar(c)) return parseNumber();
+    
+    throw std::runtime_error("Unexpected character");
 }
 
+jsonParser::jsonValue jsonParser::parse() {
+    try {
+        return parseValue();
+    } catch (const std::exception& e) {
+        std::cerr << "JSON parse error: " << e.what() << std::endl;
+        return jsonValue(); // Return default value on error
+    }
+}
