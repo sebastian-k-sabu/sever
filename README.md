@@ -1,5 +1,11 @@
 For setup compile all the source file with .cpp extention for linux
-g++ -std=c++11 -pthread main.cpp urlRouting.cpp dataParser.cpp
+```bash
+g++ -std=c++11 -pthread main.cpp urlRouting.cpp dataParser.cpp jsaonParse.cpp
+```
+then for running
+```bash
+./a.out
+```
 Run this in ur terminal
 then run
 ./a.out or the file that is created
