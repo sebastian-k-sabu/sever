@@ -7,6 +7,13 @@
 
 
 using namespace std;
+string getCurrentTime() {
+    time_t now = time(0);
+    tm* localTime = localtime(&now);
+    char formattedTime[80];
+    strftime(formattedTime, sizeof(formattedTime), "%Y-%m-%d %H:%M:%S", localTime);
+    return string(formattedTime);
+}
 string getFILE(string URL){
     ifstream f(URL);
     int dotPosition = URL.find(".");
@@ -35,12 +42,7 @@ string getFILE(string URL){
     response += "Content-Length: " + std::to_string(s.length()) + "\r\n";
     response += "\r\n";
     response +=  s;
-    time_t now = time(0);
-    tm* localTime = localtime(&now);
-
-    char formattedTime[80];
-    strftime(formattedTime, sizeof(formattedTime), "%Y-%m-%d %H:%M:%S", localTime);
-    cout<<formattedTime<<" "<<response<<" response sent"<<endl;
+    cout<<getCurrentTime()<<" "<<response<<" response sent"<<endl;
     return response;
 
        
